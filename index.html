@@ -133,13 +133,16 @@ table.det .fw{font-weight:600;text-align:right}
  <div><h1>7Q interest &amp; 14B damages calculator</h1>
  <p class="sub">Enter wages and payment dates month by month. Contributions, interest, damages and summaries work out as you type.</p></div>
  <div class="actions">
-  <button id="btnSave" hidden>Save case</button>
-  <button id="btnOpen" hidden>Open saved case</button>
+  <button id="btnSave">Save case</button>
+  <button id="btnOpen">Open saved case</button>
+  <button id="btnExport">Export case file</button>
+  <button id="btnImport">Import case file</button>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
   <button id="btnNew">New case</button>
  </div>
 </header>
 
-<div class="cases" id="casesPanel" hidden><strong>Saved cases</strong><ul id="caseList"></ul></div>
+<div class="cases" id="casesPanel" hidden><strong>Saved cases</strong> <span class="sm" id="storeNote"></span><ul id="caseList"></ul></div>
 
 <section class="case" aria-label="Case details">
  <label class="f">Establishment code<input id="estCode" placeholder="e.g. OR/3520"></label>
@@ -256,7 +259,8 @@ curFY=S.fromFY;
 const settings=()=>({pf10:S.pf==='10',eeExempt:S.ee==='exempt',flat25:S.m14==='flat',min500:!!S.min500});
 const years=()=>{const a=[];for(let y=S.fromFY;y<=S.toFY;y++)a.push(y);return a;};
 const key=(y,m)=>y+'-'+String(m).padStart(2,'0');
-let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},300);}
+let saveT;const flush=()=>{clearTimeout(saveT);try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};function persist(){clearTimeout(saveT);saveT=setTimeout(flush,300);}
+window.addEventListener('pagehide',flush);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flush();});
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
 
 function initForm(){
@@ -395,7 +399,7 @@ function setTab(t){tab=t;document.querySelectorAll('nav.tabs button').forEach(b=
 document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 function renderAll(){renderEntry();refreshSummaries();}
 
-$('btnNew').addEventListener('click',()=>{if(!confirm('Start a new case? Unsaved entries on this page will be cleared.'))return;S=blank();curFY=S.fromFY;persist();initForm();renderAll();});
+$('btnNew').addEventListener('click',()=>{if(!confirm('Start a new case? Unsaved entries on this page will be cleared.'))return;S=blank();curFY=S.fromFY;persist();initForm();renderAll();$('casesPanel').hidden=true;});
 
 /* Excel export */
 function buildWorkbook(){
@@ -510,34 +514,72 @@ document.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click',as
  finally{b.disabled=false;}
 }));
 
-/* Saved cases (private to each signed-in user) */
+/* Saved cases: kept in this browser on a normal website; in the user's private Claude storage when opened inside Claude */
+const CASES_KEY='epfo-7q14b-cases-v1';
 let db=null,uid=null;
-function caseCol(){return db.collection('data/users/'+uid);}
+const localStore={
+ all(){try{return JSON.parse(localStorage.getItem(CASES_KEY)||'{}')||{};}catch(e){return {};}},
+ write(o){localStorage.setItem(CASES_KEY,JSON.stringify(o));},
+ async list(){const o=this.all();return Object.keys(o).sort().map(id=>({id,data:o[id]}));},
+ async get(id){return this.all()[id]||null;},
+ async set(id,d){const o=this.all();o[id]=d;this.write(o);},
+ async del(id){const o=this.all();delete o[id];this.write(o);}
+};
+const claudeStore={
+ col(){return db.collection('data/users/'+uid);},
+ async list(){const snap=await this.col().get();return (snap.docs||[]).map(d=>({id:d.id,data:d.data()||{}}));},
+ async get(id){const s=await this.col().doc(id).get();return s.exists?s.data():null;},
+ async set(id,d){await this.col().doc(id).set(d);},
+ async del(id){await this.col().doc(id).delete();}
+};
+const store=()=>db?claudeStore:localStore;
 const caseId=()=>(S.estCode||'untitled').trim().replace(/[^A-Za-z0-9_\-.~:@+]+/g,'_').replace(/^\.+$/,'_').slice(0,120)||'untitled';
+function loadCase(x,msg){x={...x};delete x.savedAt;delete x.app;S=migrate(Object.assign(blank(),JSON.parse(JSON.stringify(x))));if(!S.ent||typeof S.ent!=='object')S.ent={};
+ curFY=S.fromFY;persist();initForm();renderAll();$('casesPanel').hidden=true;toast(msg);}
 $('btnSave').addEventListener('click',async()=>{
  if(!S.estCode.trim()){toast('Enter the establishment code to save the case');$('estCode').focus();return;}
- try{await caseCol().doc(caseId()).set({...S,savedAt:new Date().toISOString()});toast(`Saved ${S.estCode}`);}catch(e){toast('Could not save: '+(e.message||e.code));}
+ try{const id=caseId(),old=await store().get(id);
+  if(old&&!confirm(`A saved case for ${S.estCode} already exists. Replace it with the current entries?`))return;
+  await store().set(id,{...S,savedAt:new Date().toISOString()});toast(`Saved ${S.estCode}`);
+  if(!$('casesPanel').hidden)showCases();}
+ catch(e){toast('Could not save: '+(e.message||e.code||e));}
 });
-$('btnOpen').addEventListener('click',async()=>{
- const p=$('casesPanel');if(!p.hidden){p.hidden=true;return;}
- try{const snap=await caseCol().get();const docs=snap.docs||[];
-  $('caseList').innerHTML=docs.length?docs.map(d=>{const x=d.data()||{};return `<li><span><strong>${esc(x.estCode||d.id)}</strong> ${esc(x.estName||'')} <span style="color:var(--muted);font-size:13px">${x.savedAt?new Date(x.savedAt).toLocaleString('en-IN'):''}</span></span><span><button data-open="${esc(d.id)}">Open</button> <button data-del="${esc(d.id)}">Delete</button></span></li>`;}).join(''):'<li>No saved cases yet. Fill in a case and select Save case.</li>';
-  p.hidden=false;}catch(e){toast('Could not load saved cases: '+(e.message||e.code));}
-});
+async function showCases(){
+ const items=await store().list();items.sort((a,b)=>String(b.data.savedAt||'').localeCompare(String(a.data.savedAt||'')));
+ $('storeNote').textContent=db?'(stored in your Claude account)':'(stored in this browser on this computer — use Export case file for a backup)';
+ $('caseList').innerHTML=items.length?items.map(({id,data:x})=>`<li><span><strong>${esc(x.estCode||id)}</strong> ${esc(x.estName||'')} <span style="color:var(--muted);font-size:13px">${x.savedAt?new Date(x.savedAt).toLocaleString('en-IN'):''}</span></span><span><button data-open="${esc(id)}">Open</button> <button data-del="${esc(id)}">Delete</button></span></li>`).join(''):'<li>No saved cases yet. Fill in a case and select Save case.</li>';
+ $('casesPanel').hidden=false;
+}
+$('btnOpen').addEventListener('click',async()=>{const p=$('casesPanel');if(!p.hidden){p.hidden=true;return;}
+ try{await showCases();}catch(e){toast('Could not load saved cases: '+(e.message||e.code||e));}});
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 $('caseList').addEventListener('click',async e=>{
  const o=e.target.closest('[data-open]'),d=e.target.closest('[data-del]');
  try{
- if(o){const s=await caseCol().doc(o.dataset.open).get();if(s.exists){const x={...s.data()};delete x.savedAt;S=migrate(Object.assign(blank(),JSON.parse(JSON.stringify(x))));curFY=S.fromFY;persist();initForm();renderAll();$('casesPanel').hidden=true;toast(`Opened ${S.estCode}`);}}
- if(d&&confirm('Delete this saved case?')){await caseCol().doc(d.dataset.del).delete();d.closest('li').remove();toast('Case deleted');}
- }catch(err){toast('Something went wrong: '+(err.message||err.code));}
+  if(o){const x=await store().get(o.dataset.open);if(x)loadCase(x,`Opened ${x.estCode||o.dataset.open}`);}
+  if(d&&confirm('Delete this saved case?')){await store().del(d.dataset.del);d.closest('li').remove();toast('Case deleted');}
+ }catch(err){toast('Something went wrong: '+(err.message||err.code||err));}
+});
+/* Export / import a case as a file (backup, or move to another computer) */
+$('btnExport').addEventListener('click',async()=>{
+ const data=JSON.stringify({app:'epfo-7q-14b-calculator',version:1,savedAt:new Date().toISOString(),...S},null,1);
+ await saveFile(`${fileBase()}_case.json`,data,'application/json','Case file');
+});
+$('btnImport').addEventListener('click',()=>$('importFile').click());
+$('importFile').addEventListener('change',async e=>{
+ const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+ try{const x=JSON.parse(await f.text());
+  if(!x||typeof x!=='object'||!x.ent||typeof x.ent!=='object')throw new Error('this is not a 7Q & 14B case file');
+  if(Object.keys(S.ent).length&&!confirm('Load this case file? Entries now on the page will be replaced.'))return;
+  loadCase(x,`Imported ${x.estCode||f.name}`);}
+ catch(err){toast('Could not import: '+(err.message||err));}
 });
 
 initForm();renderAll();
 (async()=>{if(!window.claude||!window.claude.use)return;
  try{downloads=await window.claude.use('downloads');}catch(e){}
  try{const [d,u]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
-  if(d&&u){const id=await u.id();if(id){db=d;uid=id;$('btnSave').hidden=false;$('btnOpen').hidden=false;}}}catch(e){}
+  if(d&&u){const id=await u.id();if(id){db=d;uid=id;}}}catch(e){}
 })();
 </script>
 </body>
