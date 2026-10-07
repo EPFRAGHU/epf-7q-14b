@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>7Q &amp; 14B Calculator — EPFO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+ --paper:#F6F7F4;--sheet:#FFFFFF;--ink:#17233B;--muted:#5B6678;--rule:#D6DDE7;--rule-soft:#E9EDF3;
+ --blue:#2747A0;--blue-soft:#E8EDF9;--red:#B42318;--red-soft:#FBEDEB;--green:#2E6B4F;--amber:#FFF4D6;--focus:#2747A0;
+ --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+ --cond:"IBM Plex Sans Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#10151F;--sheet:#161D2A;--ink:#E3E8F1;--muted:#97A2B5;--rule:#2C3648;--rule-soft:#222B3A;--blue:#8AA6F0;--blue-soft:#1E2A44;--red:#F1897C;--red-soft:#3A2020;--green:#7CC4A0;--amber:#3A3320;--focus:#8AA6F0;}}
+:root[data-theme="dark"]{--paper:#10151F;--sheet:#161D2A;--ink:#E3E8F1;--muted:#97A2B5;--rule:#2C3648;--rule-soft:#222B3A;--blue:#8AA6F0;--blue-soft:#1E2A44;--red:#F1897C;--red-soft:#3A2020;--green:#7CC4A0;--amber:#3A3320;--focus:#8AA6F0;}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:20px 20px 60px}
+h1{font-size:26px;line-height:1.2;margin:0;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:4px 0 0;font-size:14px}
+header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+button{font:500 14px var(--sans);border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:6px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--blue);color:var(--blue)}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+button.primary:hover{filter:brightness(1.1);color:#fff}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.case{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px 18px;margin:18px 0 6px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+input,select{font:15px var(--sans);color:var(--ink);background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:7px 9px;min-width:0}
+label.f.check{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:400;font-size:14px}
+.check input{width:16px;height:16px}
+/* challan strip */
+.challan{display:grid;grid-template-columns:repeat(5,1fr);border:1.5px solid var(--ink);background:var(--sheet);margin:20px 0}
+.challan>div{padding:12px 14px;border-right:1px solid var(--rule)}
+.challan>div:last-child{border-right:0;background:var(--blue-soft)}
+.challan .k{font-size:12.5px;color:var(--muted);line-height:1.3;min-height:2.6em}
+.challan .v{font:600 22px var(--cond);font-variant-numeric:tabular-nums;margin-top:4px}
+.challan .pen .v{color:var(--red)}
+.challan .tot .v{color:var(--blue);font-size:26px}
+.period{font-size:13px;color:var(--muted);margin-top:-12px;margin-bottom:12px}
+@media (max-width:760px){.challan{grid-template-columns:1fr 1fr}.challan>div{border-bottom:1px solid var(--rule)}.challan>div:last-child{grid-column:1/-1}}
+nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--rule);margin-top:6px;overflow-x:auto}
+nav.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--muted);white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blue);font-weight:600}
+.years{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 12px}
+.years button{font:500 13px var(--cond);padding:5px 9px;font-variant-numeric:tabular-nums}
+.years button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.years button.has::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:6px;vertical-align:middle}
+.tools{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:flex-end;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.tools .grp{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
+.tools .grp input{width:150px}
+.scroll{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule);border-radius:8px}
+table{border-collapse:collapse;width:100%;font:14px var(--cond);font-variant-numeric:tabular-nums}
+th,td{padding:6px 9px;border-bottom:1px solid var(--rule-soft);text-align:right;white-space:nowrap}
+th{font:600 12.5px var(--sans);color:var(--muted);background:var(--paper);border-bottom:1px solid var(--rule);vertical-align:bottom;white-space:normal;line-height:1.25}
+th.grp{text-align:center;color:var(--ink);border-left:1px solid var(--rule)}
+td.l,th.l{text-align:left}
+td.b,th.b{border-left:1px solid var(--rule)}
+td.pen{color:var(--red)}
+td input{width:120px;padding:4px 7px;font:14px var(--cond);text-align:right;background:var(--amber);border-color:transparent}
+td input[type=date]{width:150px;text-align:left}
+tr.foot td{font-weight:600;background:var(--paper);border-top:1.5px solid var(--ink)}
+tr.new td:first-child{box-shadow:inset 3px 0 var(--blue)}
+tbody tr:hover td{background:color-mix(in srgb,var(--blue-soft) 45%,transparent)}
+.ysum{display:grid;grid-template-columns:1fr auto;max-width:620px;margin:16px 0 0 auto;border:1.5px solid var(--ink);background:var(--sheet)}
+.ysum span{padding:7px 12px;border-bottom:1px solid var(--rule-soft);font-size:14px}
+.ysum span:nth-child(even){text-align:right;font:600 15px var(--cond);font-variant-numeric:tabular-nums}
+.ysum .last{border-bottom:0;background:var(--blue-soft);font-weight:600}
+.ysum .last+span{border-bottom:0;background:var(--blue-soft);color:var(--blue);font-size:17px}
+.legend{font-size:13px;color:var(--muted);margin:8px 0 0}
+a.fy{color:var(--blue);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+details.rules{margin-top:26px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:12px 16px}
+details.rules summary{cursor:pointer;font-weight:600}
+details.rules p,details.rules li{max-width:80ch;font-size:14px}
+.cases{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:12px 14px;margin-top:12px}
+.cases ul{list-style:none;margin:8px 0 0;padding:0}
+.cases li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--rule-soft)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* stacked account-wise view: everything fits without sideways scrolling */
+table.det{table-layout:fixed}
+table.det th,table.det td{white-space:normal;padding:6px 7px;vertical-align:top}
+table.det th.acc{text-align:center}
+table.det th small{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+.stk{display:grid;grid-template-columns:auto 1fr;column-gap:4px;row-gap:1px;align-items:baseline}
+.stk span{font:400 11px var(--sans);color:var(--muted);text-align:left}
+.stk b{font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.stk b.pen{color:var(--red)}
+.stk b.strong{font-weight:700;color:var(--blue)}
+td.acc.tot,th.acc.tot{background:color-mix(in srgb,var(--blue-soft) 55%,transparent)}
+.mn{font-weight:500;color:var(--ink)}
+.sm{font-size:11.5px;color:var(--muted)}
+.only-m{display:none}
+table.det .ins{display:flex;flex-direction:column;gap:4px}
+table.det .ins input{width:100%}
+#monthTable.det th:nth-child(1){width:96px}#monthTable.det th:nth-child(2){width:138px}#monthTable.det th:nth-child(3){width:74px}table.det .sm{white-space:nowrap}table.det .ins input{padding:4px 5px}#acctTable.det th:nth-child(1){width:84px}
+table.det .fw{font-weight:600;text-align:right}
+@media (max-width:1200px){table.det{font-size:13px}table.det th,table.det td{padding:5px 4px}.wrap{padding-left:12px;padding-right:12px}}
+@media (max-width:1080px){
+ table.stack thead{display:none}
+ table.stack,table.stack tbody{display:block}
+ table.stack tr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;padding:10px 12px;border-bottom:1px solid var(--rule)}
+ table.stack td{display:block;border:0;padding:0;text-align:left;white-space:normal}
+ table.stack td.mcell{grid-column:1/-1}
+ table.stack td[data-label]::before{content:attr(data-label);display:block;font:500 11.5px var(--sans);color:var(--muted);margin-bottom:2px}
+ table.stack td.hide-m{display:none}
+ table.stack .only-m{display:block}
+ table.stack td input{width:100%}
+ table.stack td.acc{border:1px solid var(--rule-soft);border-radius:6px;padding:6px 8px}
+ table.stack td.acc.tot{grid-column:1/-1}
+ table.stack tr.foot td{border-top:0}
+ table.stack tr.new{box-shadow:inset 3px 0 var(--blue)}
+ tr.new td:first-child{box-shadow:none}
+}
+.dlbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0 0}
+.dlbar span{font-weight:600;margin-right:4px}
+.dlbar button[data-pdf]{border-color:var(--blue);color:var(--blue)}
+.dlbar button[disabled]{opacity:.6;cursor:progress}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+ <div><h1>7Q interest &amp; 14B damages calculator</h1>
+ <p class="sub">Enter wages and payment dates month by month. Contributions, interest, damages and summaries work out as you type.</p></div>
+ <div class="actions">
+  <button id="btnSave" hidden>Save case</button>
+  <button id="btnOpen" hidden>Open saved case</button>
+  <button id="btnNew">New case</button>
+ </div>
+</header>
+
+<div class="cases" id="casesPanel" hidden><strong>Saved cases</strong><ul id="caseList"></ul></div>
+
+<section class="case" aria-label="Case details">
+ <label class="f">Establishment code<input id="estCode" placeholder="e.g. OR/3520"></label>
+ <label class="f">Establishment name<input id="estName" placeholder="Name of establishment"></label>
+ <label class="f">From year<select id="fromFY"></select></label>
+ <label class="f">To year<select id="toFY"></select></label>
+ <label class="f">PF contribution rate<select id="pf">
+  <option value="12">12% (10% before Oct-1997)</option>
+  <option value="10">10% throughout</option></select></label>
+ <label class="f">Employees' share in A/c 1<select id="ee">
+  <option value="full">Included (A/c 1 = 15.67%)</option>
+  <option value="exempt">Exempt (A/c 1 = 3.67%)</option></select></label>
+ <label class="f">14B for dues before 14.06.2024<select id="m14">
+  <option value="slab">Para 32A slabs by period of delay</option>
+  <option value="flat">Highest slab: 37% / 25% p.a. (as in Excel)</option></select></label>
+ <label class="f check"><input type="checkbox" id="min500"> A/c 2 minimum ₹500 per month from Apr-2017</label>
+</section>
+
+<div class="dlbar" role="group" aria-label="Downloads"><span>Download</span>
+ <button data-pdf="month-year">Monthly entry PDF (this year)</button>
+ <button data-pdf="month-all">Monthly entry PDF (all years)</button>
+ <button data-pdf="yearly">Year-wise summary PDF</button>
+ <button data-pdf="acct">Account-wise summary PDF</button>
+ <button id="btnXlsx">Excel workbook</button></div>
+<div class="challan" id="challan"></div>
+<p class="period" id="periodNote"></p>
+
+<nav class="tabs" role="tablist">
+ <button role="tab" data-tab="entry" aria-selected="true">Monthly entry</button>
+ <button role="tab" data-tab="yearly" aria-selected="false">Year-wise summary</button>
+ <button role="tab" data-tab="acct" aria-selected="false">Account-wise summary</button>
+</nav>
+
+<section id="tab-entry">
+ <div class="years" id="years"></div>
+ <div class="tools">
+  <div class="grp"><label class="f">Wages for every month<input id="bulkW" type="text" inputmode="numeric" autocomplete="off" placeholder="₹"></label>
+   <button data-bulk="w-year">This year</button><button data-bulk="w-all">All years</button></div>
+  <div class="grp"><label class="f">Paid date for every month<input id="bulkP" type="date"></label>
+   <button data-bulk="p-year">This year</button><button data-bulk="p-all">All years</button></div>
+  <label class="f check"><input type="checkbox" id="detail"> Show account-wise columns</label>
+  <button id="clearYear">Clear this year</button>
+ </div>
+ <div class="scroll"><table id="monthTable"></table></div>
+ <p class="legend">Yellow cells are for entry. A blue bar marks months due on or after 14.06.2024, where 14B is 1% per month or part of a month.</p>
+ <div class="ysum" id="ysum"></div>
+</section>
+
+<section id="tab-yearly" hidden><div class="scroll" style="margin-top:16px"><table id="yearTable"></table></div>
+ <p class="legend">Select a year to open its monthly entries.</p></section>
+<section id="tab-acct" hidden><div class="scroll" style="margin-top:16px"><table id="acctTable"></table></div>
+ <p class="legend">14B levied is limited to 100% of that account's contribution for the year.</p></section>
+
+<details class="rules"><summary>How the amounts are calculated</summary>
+<ul>
+<li>Due date is the 15th of the month following the wage month. Delay is counted in days from the due date to the date of payment.</li>
+<li>A/c 1 is the employer's share less 8.33% pension, plus the employees' share unless exempt. The PF rate is 10% for wage months up to Sep-1997 and 12% from Oct-1997 (raised from 22.09.1997), unless 10% throughout is selected. With 12%: A/c 1 is 15.67%, or 3.67% if the employees' share is exempt.</li>
+<li>Other rates on wages: A/c 2 at 0.65% up to Jul-1998, 1.10% from Aug-1998 to Dec-2014, 0.85% from Jan-2015, 0.65% from Apr-2017 and 0.50% from Jun-2018; A/c 10 at 8.33%; A/c 21 at 0.50%; A/c 22 at 0.01% up to Mar-2017 and nil after.</li>
+<li>7Q interest is 12% a year on each account's contribution for the days of delay, rounded to the rupee. It applies to dues falling on or after 01.07.1997, when Section 7Q came into force.</li>
+<li>14B for months due before 14.06.2024 uses a per-annum rate for the days of delay, set by the total period of delay. For dues before 26.09.2008 the Para 32A slabs are 17%, 22%, 27% and 37% (under 2, 2–4, 4–6, and 6 months or more); from 26.09.2008 they are 5%, 10%, 15% and 25%. The highest-slab option applies 37% or 25% to every month, as in the Excel sheet. For months due from 14.06.2024 it is 1% of the contribution for each month of delay, with any part of a month counted as a full month (GSR 327(E) dated 14.06.2024; EPFO letter dated 28.08.2024).</li>
+<li>For each year, 14B levied (D) is limited to 100% of the contribution (A). Amount to be deposited is (B) + (D).</li>
+</ul></details>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const ACC=['1','2','10','21','22'];
+const CUT=Date.UTC(2024,5,14),CUT08=Date.UTC(2008,8,26),Q7=Date.UTC(1997,6,1);
+function utc(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d);}
+function addMonthsUTC(t,n){const d=new Date(t);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,d.getUTCDate());}
+function datedif(a,b){const A=new Date(a),B=new Date(b);let m=(B.getUTCFullYear()-A.getUTCFullYear())*12+(B.getUTCMonth()-A.getUTCMonth());if(B.getUTCDate()<A.getUTCDate())m--;const md=Math.round((b-addMonthsUTC(a,m))/864e5);return{m,md};}
+function rates(y,mo,s){const k=y*100+mo,base=(s.pf10||k<199710)?10:12;return{'1':(s.eeExempt?0:base)+base-8.33,'2':k<199808?0.65:k<201501?1.10:k<201704?0.85:k<201806?0.65:0.50,'10':8.33,'21':0.5,'22':k<201704?0.01:0};}
+function slab(m,old){const r=m<2?0.05:m<4?0.10:m<6?0.15:0.25;return old?r+0.12:r;}
+function calcMonth(y,mo,e,s){
+  const due=Date.UTC(mo===12?y+1:y,mo===12?0:mo,15);
+  const r=rates(y,mo,s),w=Number(e&&e.w)||0,paid=utc(e&&e.p);
+  const delay=paid&&paid>due?Math.round((paid-due)/864e5):0;
+  const dd=delay?datedif(due,paid):null;
+  const newRule=due>=CUT;
+  let rate14,months14=0;
+  if(newRule){months14=dd?dd.m+(dd.md>0?1:0):0;rate14=0.01;}
+  else{const old=due<CUT08;rate14=s.flat25?(old?0.37:0.25):(dd?slab(dd.m,old):(old?0.17:0.05));}
+  const q7=due>=Q7;
+  const acc={};
+  for(const a of ACC){let c=w*r[a]/100;
+    if(a==='2'&&s.min500&&w>0&&y*100+mo>=201704)c=Math.max(500,c);
+    const q=q7?Math.round(c*0.12/365*delay+1e-9):0;
+    const b=delay?(newRule?Math.round(c*0.01*months14+1e-9):Math.round(c*rate14/365*delay+1e-9)):0;
+    acc[a]={c,q,b};}
+  return{y,mo,due,w,paid,delay,dd,newRule,rate14,months14,q7,acc};
+}
+function calcYear(fy,ent,s){
+  const rows=[];for(let i=0;i<12;i++){const mo=(i+3)%12+1,y=mo<4?fy+1:fy;rows.push(calcMonth(y,mo,ent[y+'-'+String(mo).padStart(2,'0')],s));}
+  const tot={};for(const a of ACC){tot[a]={c:0,q:0,b:0};for(const r of rows){tot[a].c+=r.acc[a].c;tot[a].q+=r.acc[a].q;tot[a].b+=r.acc[a].b;}tot[a].d=Math.min(tot[a].b,tot[a].c);}
+  const A=ACC.reduce((s,a)=>s+tot[a].c,0),B=ACC.reduce((s,a)=>s+tot[a].q,0),C=ACC.reduce((s,a)=>s+tot[a].b,0),D=Math.min(C,A);
+  return{fy,rows,tot,A,B,C,D,total:B+D,wages:rows.reduce((s,r)=>s+r.w,0)};
+}
+
+
+const FIRST=1997,LAST=2026,KEY='epfo-7q14b-draft-v1';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const inr=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
+const inr2=new Intl.NumberFormat('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const R=v=>'₹ '+inr.format(Math.round(v||0));
+const $=id=>document.getElementById(id);
+const cleanNum=v=>{v=String(v).replace(/[^0-9.]/g,'');const i=v.indexOf('.');return i<0?v:v.slice(0,i+1)+v.slice(i+1).replace(/\./g,'');};
+const fyLabel=fy=>fy+'-'+String(fy+1).slice(2);
+const dmy=t=>{if(t==null)return '';const d=new Date(t);return String(d.getUTCDate()).padStart(2,'0')+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+d.getUTCFullYear();};
+const blank=()=>({estCode:'',estName:'',fromFY:1997,toFY:2025,pf:'12',ee:'full',m14:'slab',min500:false,ent:{}});
+function migrate(x){if(x.a1&&!x.ee){x.ee=x.a1==='3.67'?'exempt':'full';}delete x.a1;if(!x.pf)x.pf='12';return x;}
+let S=blank(),curFY=2009,tab='entry';
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.ent)S=migrate(Object.assign(blank(),s));}catch(e){}
+curFY=S.fromFY;
+const settings=()=>({pf10:S.pf==='10',eeExempt:S.ee==='exempt',flat25:S.m14==='flat',min500:!!S.min500});
+const years=()=>{const a=[];for(let y=S.fromFY;y<=S.toFY;y++)a.push(y);return a;};
+const key=(y,m)=>y+'-'+String(m).padStart(2,'0');
+let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},300);}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
+
+function initForm(){
+ for(const id of ['fromFY','toFY']){const s=$(id);s.innerHTML='';for(let y=FIRST;y<=LAST;y++)s.add(new Option(fyLabel(y),y));}
+ $('estCode').value=S.estCode;$('estName').value=S.estName;$('fromFY').value=S.fromFY;$('toFY').value=S.toFY;
+ $('pf').value=S.pf;$('ee').value=S.ee;$('m14').value=S.m14;$('min500').checked=S.min500;
+}
+function onSetting(){
+ S.estCode=$('estCode').value;S.estName=$('estName').value;S.pf=$('pf').value;S.ee=$('ee').value;S.m14=$('m14').value;S.min500=$('min500').checked;
+ let f=+$('fromFY').value,t=+$('toFY').value;if(t<f){t=f;$('toFY').value=t;}S.fromFY=f;S.toFY=t;
+ if(curFY<f||curFY>t)curFY=f;persist();renderAll();
+}
+['estCode','estName'].forEach(id=>$(id).addEventListener('input',()=>{S[id]=$(id).value;persist();}));
+['fromFY','toFY','pf','ee','m14','min500'].forEach(id=>$(id).addEventListener('change',onSetting));
+
+function allYears(){const s=settings();return years().map(fy=>calcYear(fy,S.ent,s));}
+function renderChallan(Y){
+ const sum=k=>Y.reduce((a,y)=>a+y[k],0);
+ $('challan').innerHTML=`<div><div class="k">Contribution (A)</div><div class="v">${R(sum('A'))}</div></div>
+ <div class="pen"><div class="k">7Q interest levied (B)</div><div class="v">${R(sum('B'))}</div></div>
+ <div class="pen"><div class="k">14B damages calculated (C)</div><div class="v">${R(sum('C'))}</div></div>
+ <div class="pen"><div class="k">14B levied, max 100% (D)</div><div class="v">${R(sum('D'))}</div></div>
+ <div class="tot"><div class="k">Amount to be deposited (B + D)</div><div class="v">${R(sum('total'))}</div></div>`;
+ $('periodNote').textContent=`Totals for ${fyLabel(S.fromFY)} to ${fyLabel(S.toFY)}`+(S.estCode?` · ${S.estCode}`:'')+(S.estName?` ${S.estName}`:'');
+}
+function renderYears(){
+ $('years').innerHTML=years().map(fy=>{const has=[...Array(12)].some((_,i)=>{const m=(i+3)%12+1,y=m<4?fy+1:fy;const e=S.ent[key(y,m)];return e&&(+e.w>0);});
+  return `<button class="${fy===curFY?'on':''} ${has?'has':''}" data-fy="${fy}" aria-pressed="${fy===curFY}">${fyLabel(fy)}</button>`;}).join('');
+}
+$('years').addEventListener('click',e=>{const b=e.target.closest('[data-fy]');if(b){curFY=+b.dataset.fy;renderEntry();}});
+
+const ACN={'1':'A/c 1','2':'A/c 2','10':'A/c 10','21':'A/c 21','22':'A/c 22'};
+function rate14Text(r){if(!r.delay)return '';return r.newRule?`1% × ${r.months14} mo`:`${Math.round(r.rate14*100)}% p.a.`;}
+function delayText(r){return r.dd?`${r.dd.m} m ${r.dd.md} d`:'';}
+function renderEntry(){
+ renderYears();
+ const det=$('detail').checked,Y=calcYear(curFY,S.ent,settings());
+ const tb=$('monthTable');tb.className=det?'stack det':'stack';
+ let h=`<thead><tr><th class="l">Wage month</th>`;
+ if(det){
+  h+=`<th class="l">Wages &amp; paid on</th><th>Delay</th>`+ACC.map(a=>`<th class="b acc">${ACN[a]}<small>Contri. / 7Q / 14B</small></th>`).join('')+`<th class="b acc tot">All accounts<small>Contri. / 7Q / 14B</small></th>`;
+ }else{
+  h+=`<th class="l">Due date</th><th>Wages (₹)</th><th class="l">Paid on</th><th>Delay (days)</th><th>Delay</th><th class="b">Contribution</th><th>7Q interest</th><th>14B rate</th><th>14B damages</th>`;
+ }
+ h+=`</tr></thead><tbody>`;
+ const stk=(rows,cls='')=>`<div class="stk ${cls}">`+rows.map(([l,c,pen])=>`<span>${l}</span><b class="${pen?'pen':''}" data-c="${c}"></b>`).join('')+`</div>`;
+ Y.rows.forEach((r,i)=>{const k=key(r.y,r.mo),e=S.ent[k]||{},lab=`${MON[r.mo-1]}-${r.y}`;
+  const wIn=`<input type="text" inputmode="numeric" autocomplete="off" data-k="${k}" data-f="w" value="${e.w??''}" aria-label="Wages ${lab}" placeholder="Wages">`;
+  const pIn=`<input type="date" data-k="${k}" data-f="p" value="${e.p||''}" aria-label="Paid date ${lab}">`;
+  h+=`<tr class="${r.newRule?'new':''}" data-row="${i}">`;
+  if(det){
+   h+=`<td class="l mcell"><div class="mn">${lab}</div><div class="sm">Due ${dmy(r.due)}</div></td>
+   <td class="l icell" data-label="Wages / paid on"><div class="ins">${wIn}${pIn}</div></td>
+   <td class="dcell" data-label="Delay"><div data-c="delay"></div><div class="sm" data-c="dd"></div></td>`;
+   h+=ACC.map(a=>`<td class="b acc" data-label="${ACN[a]}">${stk([['Contri.','c'+a],['7Q','q'+a,1],['14B','b'+a,1]])}</td>`).join('');
+   h+=`<td class="b acc tot" data-label="All accounts">${stk([['Contri.','tc'],['7Q','tq',1],['14B','tb',1],['Rate','rt']])}</td>`;
+  }else{
+   h+=`<td class="l mcell"><div class="mn">${lab}</div><div class="sm only-m">Due ${dmy(r.due)}</div></td><td class="l hide-m">${dmy(r.due)}</td>
+   <td data-label="Wages (₹)">${wIn}</td><td class="l" data-label="Paid on">${pIn}</td>
+   <td data-label="Delay (days)" data-c="delay"></td><td data-label="Delay" data-c="dd"></td>
+   <td class="b" data-label="Contribution" data-c="tc"></td><td class="pen" data-label="7Q interest" data-c="tq"></td><td data-label="14B rate" data-c="rt"></td><td class="pen" data-label="14B damages" data-c="tb"></td>`;
+  }
+  h+=`</tr>`;});
+ h+=`<tr class="foot"><td class="l mcell"><div class="mn">Total ${fyLabel(curFY)}</div></td>`;
+ if(det){
+  h+=`<td class="l icell" data-label="Wages"><div data-c="fw" class="fw"></div></td><td class="dcell"></td>`+
+   ACC.map(a=>`<td class="b acc" data-label="${ACN[a]}">${stk([['Contri.','fc'+a],['7Q','fq'+a,1],['14B','fb'+a,1]])}</td>`).join('')+
+   `<td class="b acc tot" data-label="All accounts">${stk([['Contri.','fc'],['7Q','fq',1],['14B','fb',1]])}</td>`;
+ }else{
+  h+=`<td class="hide-m"></td><td data-label="Wages (₹)" data-c="fw"></td><td class="hide-m"></td><td class="hide-m"></td><td class="hide-m"></td><td class="b" data-label="Contribution" data-c="fc"></td><td class="pen" data-label="7Q interest" data-c="fq"></td><td class="hide-m"></td><td class="pen" data-label="14B damages" data-c="fb"></td>`;
+ }
+ h+=`</tr></tbody>`;
+ tb.innerHTML=h;updateEntry(Y);
+}
+function updateEntry(Y){
+ Y=Y||calcYear(curFY,S.ent,settings());const tb=$('monthTable');
+ const set=(row,c,v)=>{const el=row.querySelector(`[data-c="${c}"]`);if(el)el.textContent=v;};
+ Y.rows.forEach((r,i)=>{const row=tb.querySelector(`tr[data-row="${i}"]`);
+  const tc=ACC.reduce((s,a)=>s+r.acc[a].c,0),tq=ACC.reduce((s,a)=>s+r.acc[a].q,0),tbb=ACC.reduce((s,a)=>s+r.acc[a].b,0);
+  set(row,'delay',r.delay?inr.format(r.delay):'');set(row,'dd',delayText(r));
+  ACC.forEach(a=>{set(row,'c'+a,r.w?inr2.format(r.acc[a].c):'');set(row,'q'+a,r.delay?inr.format(r.acc[a].q):'');set(row,'b'+a,r.delay?inr.format(r.acc[a].b):'');});
+  set(row,'tc',r.w?inr2.format(tc):'');set(row,'tq',r.delay&&r.w?inr.format(tq):'');set(row,'rt',r.w?rate14Text(r):'');set(row,'tb',r.delay&&r.w?inr.format(tbb):'');});
+ const f=tb.querySelector('tr.foot');set(f,'fw',inr.format(Y.wages));
+ ACC.forEach(a=>{set(f,'fc'+a,inr2.format(Y.tot[a].c));set(f,'fq'+a,inr.format(Y.tot[a].q));set(f,'fb'+a,inr.format(Y.tot[a].b));});
+ set(f,'fc',inr2.format(Y.A));set(f,'fq',inr.format(Y.B));set(f,'fb',inr.format(Y.C));
+ const L=fyLabel(curFY);
+ $('ysum').innerHTML=`<span>Contribution deposited for the year (${L}) (A)</span><span>${R(Y.A)}</span>
+ <span>7Q interest levied (B)</span><span>${R(Y.B)}</span><span>14B damages calculated (C)</span><span>${R(Y.C)}</span>
+ <span>14B levied at maximum 100% of contribution (D)</span><span>${R(Y.D)}</span>
+ <span class="last">Amount to be deposited for the year (${L}) (B + D)</span><span>${R(Y.total)}</span>`;
+}
+$('monthTable').addEventListener('input',e=>{const t=e.target;if(!t.dataset.k)return;
+ const e0=S.ent[t.dataset.k]||(S.ent[t.dataset.k]={});
+ if(t.dataset.f==='w'){const v=cleanNum(t.value);e0.w=v===''?'':Number(v);}else e0.p=t.value;
+ persist();updateEntry();refreshSummaries();renderYearsLight();});
+function renderYearsLight(){renderYears();}
+$('detail').addEventListener('change',renderEntry);
+
+function monthsOf(fy){return [...Array(12)].map((_,i)=>{const m=(i+3)%12+1;return key(m<4?fy+1:fy,m);});}
+document.querySelectorAll('[data-bulk]').forEach(b=>b.addEventListener('click',()=>{
+ const [f,scope]=b.dataset.bulk.split('-');const v=f==='w'?cleanNum($('bulkW').value):$('bulkP').value;
+ if(v===''){toast(f==='w'?'Enter the wages first':'Pick the paid date first');return;}
+ const ys=scope==='all'?years():[curFY];
+ ys.forEach(fy=>monthsOf(fy).forEach(k=>{const e=S.ent[k]||(S.ent[k]={});e[f]=f==='w'?Number(v):v;}));
+ persist();renderEntry();refreshSummaries();
+ toast(`${f==='w'?'Wages':'Paid date'} applied to ${scope==='all'?'all years':fyLabel(curFY)}`);}));
+$('clearYear').addEventListener('click',()=>{if(!confirm(`Clear wages and paid dates for ${fyLabel(curFY)}?`))return;
+ monthsOf(curFY).forEach(k=>delete S.ent[k]);persist();renderEntry();refreshSummaries();});
+
+function renderYearly(Y){
+ let h=`<thead><tr><th class="l">Sl.</th><th class="l">Financial year</th><th>Wages</th><th class="b">Contribution (A)</th><th>7Q levied (B)</th><th>14B calculated (C)</th><th>14B levied, max 100% (D)</th><th class="b">Amount to be deposited (B + D)</th></tr></thead><tbody>`;
+ const t={w:0,A:0,B:0,C:0,D:0,total:0};
+ Y.forEach((y,i)=>{for(const k in t)t[k]+=k==='w'?y.wages:y[k];
+  h+=`<tr><td class="l">${i+1}</td><td class="l"><a class="fy" data-go="${y.fy}">${fyLabel(y.fy)}</a></td><td>${inr.format(y.wages)}</td><td class="b">${R(y.A)}</td><td class="pen">${R(y.B)}</td><td class="pen">${R(y.C)}</td><td class="pen">${R(y.D)}</td><td class="b"><strong>${R(y.total)}</strong></td></tr>`;});
+ h+=`<tr class="foot"><td class="l" colspan="2">Grand total</td><td>${inr.format(t.w)}</td><td class="b">${R(t.A)}</td><td class="pen">${R(t.B)}</td><td class="pen">${R(t.C)}</td><td class="pen">${R(t.D)}</td><td class="b">${R(t.total)}</td></tr></tbody>`;
+ $('yearTable').innerHTML=h;
+}
+function renderAcct(Y){
+ const st=(rows)=>`<div class="stk">`+rows.map(([l,v,pen,bold])=>`<span>${l}</span><b class="${pen?'pen':''}${bold?' strong':''}">${v}</b>`).join('')+`</div>`;
+ const n=v=>inr.format(Math.round(v));
+ let h=`<thead><tr><th class="l">Financial year</th>`+ACC.map(a=>`<th class="b acc">${ACN[a]}<small>Contri. / 7Q / 14B calc. / 14B levied</small></th>`).join('')+`<th class="b acc tot">All accounts<small>(A) / (B) / (D) / B + D</small></th></tr></thead><tbody>`;
+ const G={};ACC.forEach(a=>G[a]={c:0,q:0,b:0,d:0});const GT={A:0,B:0,D:0,T:0};
+ Y.forEach((y,i)=>{let dsum=0;h+=`<tr><td class="l mcell"><div class="mn"><a class="fy" data-go="${y.fy}">${fyLabel(y.fy)}</a></div></td>`;
+  ACC.forEach(a=>{const t=y.tot[a];dsum+=t.d;for(const k of ['c','q','b','d'])G[a][k]+=t[k];
+   h+=`<td class="b acc" data-label="${ACN[a]}">${st([['Contri.',n(t.c)],['7Q',n(t.q),1],['14B calc.',n(t.b),1],['14B levied',n(t.d),1]])}</td>`;});
+  GT.A+=y.A;GT.B+=y.B;GT.D+=dsum;GT.T+=y.B+dsum;
+  h+=`<td class="b acc tot" data-label="All accounts">${st([['(A)',n(y.A)],['(B)',n(y.B),1],['(D)',n(dsum),1],['B + D',n(y.B+dsum),0,1]])}</td></tr>`;});
+ h+=`<tr class="foot"><td class="l mcell"><div class="mn">Grand total</div></td>`+ACC.map(a=>`<td class="b acc" data-label="${ACN[a]}">${st([['Contri.',n(G[a].c)],['7Q',n(G[a].q),1],['14B calc.',n(G[a].b),1],['14B levied',n(G[a].d),1]])}</td>`).join('')+
+  `<td class="b acc tot" data-label="All accounts">${st([['(A)',n(GT.A)],['(B)',n(GT.B),1],['(D)',n(GT.D),1],['B + D',n(GT.T),0,1]])}</td></tr></tbody>`;
+ const t=$('acctTable');t.className='stack det';t.innerHTML=h;
+}
+document.addEventListener('click',e=>{const a=e.target.closest('[data-go]');if(a){curFY=+a.dataset.go;setTab('entry');renderEntry();}});
+function refreshSummaries(){const Y=allYears();renderChallan(Y);if(tab==='yearly')renderYearly(Y);if(tab==='acct')renderAcct(Y);}
+function setTab(t){tab=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+ ['entry','yearly','acct'].forEach(x=>$('tab-'+x).hidden=x!==t);refreshSummaries();}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function renderAll(){renderEntry();refreshSummaries();}
+
+$('btnNew').addEventListener('click',()=>{if(!confirm('Start a new case? Unsaved entries on this page will be cleared.'))return;S=blank();curFY=S.fromFY;persist();initForm();renderAll();});
+
+/* Excel export */
+function buildWorkbook(){
+ const Y=allYears(),wb=XLSX.utils.book_new(),r2=v=>Math.round(v*100)/100;
+ const head=[[`7Q & 14B calculation — ${S.estCode} ${S.estName}`.trim()],[`Period ${fyLabel(S.fromFY)} to ${fyLabel(S.toFY)}; PF rate ${S.pf}%, employees' share ${S.ee==='exempt'?'exempt':'included'}; 14B before 14.06.2024: ${S.m14==='flat'?'highest slab (37% / 25% p.a.)':'Para 32A slabs'}; from 14.06.2024: 1% per month or part${S.min500?'; A/c 2 min ₹500 from Apr-2017':''}`],[]];
+ const m=[...head,['Financial year','Wage month','Due date','Paid date','Wages','Delay days','Delay','14B rate',...ACC.flatMap(a=>[ACN[a]+' contribution',ACN[a]+' 7Q',ACN[a]+' 14B']),'Total contribution','Total 7Q','Total 14B']];
+ Y.forEach(y=>y.rows.forEach(r=>{m.push([fyLabel(y.fy),`${MON[r.mo-1]}-${r.y}`,dmy(r.due),dmy(r.paid),r.w,r.delay,delayText(r),r.w?rate14Text(r):'',...ACC.flatMap(a=>[r2(r.acc[a].c),r.acc[a].q,r.acc[a].b]),r2(ACC.reduce((s,a)=>s+r.acc[a].c,0)),ACC.reduce((s,a)=>s+r.acc[a].q,0),ACC.reduce((s,a)=>s+r.acc[a].b,0)]);}));
+ const ws1=XLSX.utils.aoa_to_sheet(m);ws1['!cols']=[{wch:13},{wch:11},{wch:11},{wch:11},{wch:11},{wch:9},{wch:12},{wch:12},...Array(18).fill({wch:12})];
+ const y=[...head,['Sl.','Financial year','Wages','Contribution (A)','7Q levied (B)','14B calculated (C)','14B levied max 100% (D)','Amount to be deposited (B+D)']];
+ const t=[0,0,0,0,0,0];Y.forEach((v,i)=>{const row=[v.wages,r2(v.A),v.B,v.C,r2(v.D),r2(v.total)];row.forEach((x,j)=>t[j]+=x);y.push([i+1,fyLabel(v.fy),...row]);});
+ y.push(['','Grand total',...t.map(r2)]);
+ const ws2=XLSX.utils.aoa_to_sheet(y);ws2['!cols']=[{wch:5},{wch:14},...Array(6).fill({wch:18})];
+ const a=[...head,['Sl.','Financial year',...ACC.flatMap(x=>[ACN[x]+' contribution',ACN[x]+' 7Q',ACN[x]+' 14B calculated',ACN[x]+' 14B levied']),'Contribution (A)','7Q (B)','14B levied (D)','B + D']];
+ const at=Array(24).fill(0);
+ Y.forEach((v,i)=>{let d=0;const row=ACC.flatMap(x=>{d+=v.tot[x].d;return [r2(v.tot[x].c),v.tot[x].q,v.tot[x].b,r2(v.tot[x].d)];});row.push(r2(v.A),v.B,r2(d),r2(v.B+d));row.forEach((x,j)=>at[j]+=x);a.push([i+1,fyLabel(v.fy),...row]);});
+ a.push(['','Grand total',...at.map(r2)]);
+ const ws3=XLSX.utils.aoa_to_sheet(a);ws3['!cols']=[{wch:5},{wch:14},...Array(24).fill({wch:14})];
+ XLSX.utils.book_append_sheet(wb,ws2,'Year-wise summary');XLSX.utils.book_append_sheet(wb,ws3,'Account-wise summary');XLSX.utils.book_append_sheet(wb,ws1,'Monthly calculation');
+ return XLSX.write(wb,{bookType:'xlsx',type:'array'});
+}
+let downloads=null;
+const fileBase=()=>`7Q_14B_${(S.estCode||'calculation').replace(/[^A-Za-z0-9_-]+/g,'_')}`;
+async function saveFile(name,data,mime,label){
+ if(downloads){try{await downloads.save({filename:name,data});toast(label+' saved');}catch(e){if(e&&e.code!=='declined')toast('Could not save the file: '+(e.message||e.code));}return;}
+ try{const url=URL.createObjectURL(new Blob([data],{type:mime}));const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);}catch(e){toast('Download is not available here');}
+}
+$('btnXlsx').addEventListener('click',async()=>{
+ if(typeof XLSX==='undefined'){toast('Excel library did not load. Check your connection and reload.');return;}
+ await saveFile(`${fileBase()}_${fyLabel(S.fromFY)}_to_${fyLabel(S.toFY)}.xlsx`,new Uint8Array(buildWorkbook()),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Excel file');
+});
+
+/* PDF reports */
+const P=v=>inr.format(Math.round(v||0)),P2=v=>inr2.format(v||0);
+function pdfLib(){const J=window.jspdf&&window.jspdf.jsPDF;if(!J)return null;
+ const at=window.autoTable||(window.jspdf_autotable&&window.jspdf_autotable.autoTable)||null;
+ return{J,at:(doc,o)=>at?at(doc,o):doc.autoTable(o)};}
+function settingsLine(){return `PF rate ${S.pf==='10'?'10% throughout':'12% (10% before Oct-1997)'}; employees' share ${S.ee==='exempt'?'exempt':'included'} in A/c 1; 14B before 14.06.2024: ${S.m14==='flat'?'highest slab (37% / 25% p.a.)':'Para 32A slabs'}; from 14.06.2024: 1% per month or part${S.min500?'; A/c 2 minimum Rs. 500 from Apr-2017':''}; 7Q @ 12% p.a.`;}
+function pdfHeader(doc,title,sub){
+ const w=doc.internal.pageSize.getWidth();
+ doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(23,35,59);doc.text(title,30,34);
+ doc.setFont('helvetica','normal');doc.setFontSize(9);
+ const est=[S.estCode,S.estName].filter(Boolean).join(' - ')||'Establishment not named';
+ doc.text(`Establishment: ${est}`,30,50);doc.text(sub,w-30,50,{align:'right'});
+ doc.setFontSize(7);doc.setTextColor(91,102,120);doc.text(doc.splitTextToSize(settingsLine(),w-60),30,62);
+ doc.setDrawColor(23,35,59);doc.setLineWidth(1);doc.line(30,72,w-30,72);doc.setTextColor(23,35,59);
+ return 80;}
+function pdfFooter(doc){const n=doc.getNumberOfPages(),w=doc.internal.pageSize.getWidth(),h=doc.internal.pageSize.getHeight();
+ const d=new Date(),stamp=`Generated on ${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+ for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(91,102,120);doc.text(stamp,30,h-16);doc.text(`Page ${i} of ${n}`,w-30,h-16,{align:'right'});}}
+const TH={fillColor:[232,237,249],textColor:[23,35,59],fontStyle:'bold',halign:'center',valign:'middle',lineColor:[190,200,215],lineWidth:0.5};
+const FOOT={fillColor:[255,244,214],textColor:[23,35,59],fontStyle:'bold',lineColor:[190,200,215],lineWidth:0.5};
+const RED=[180,35,24];
+function monthPage(doc,L,fy){
+ const Y=calcYear(fy,S.ent,settings());let y=pdfHeader(doc,'Calculation of 7Q interest and 14B damages - monthly statement',`Financial year ${fyLabel(fy)}`);
+ const head=[[{content:'Wage month',rowSpan:2},{content:'Due date',rowSpan:2},{content:'Paid on',rowSpan:2},{content:'Delay (days)',rowSpan:2},{content:'Wages (Rs.)',rowSpan:2},
+  ...ACC.map(a=>({content:ACN[a],colSpan:3})),{content:'All accounts',colSpan:4}],
+  [...ACC.flatMap(()=>['Contri.','7Q','14B']),'Contri.','7Q','14B rate','14B']];
+ const body=Y.rows.map(r=>{const tq=ACC.reduce((s,a)=>s+r.acc[a].q,0),tb=ACC.reduce((s,a)=>s+r.acc[a].b,0),tc=ACC.reduce((s,a)=>s+r.acc[a].c,0);
+  return [`${MON[r.mo-1]}-${r.y}`,dmy(r.due),dmy(r.paid),r.delay?inr.format(r.delay):'',r.w?inr.format(r.w):'',
+   ...ACC.flatMap(a=>[r.w?P2(r.acc[a].c):'',r.delay?P(r.acc[a].q):'',r.delay?P(r.acc[a].b):'']),
+   r.w?P2(tc):'',r.delay&&r.w?P(tq):'',r.w?rate14Text(r).replace('×','x'):'',r.delay&&r.w?P(tb):''];});
+ const foot=[[{content:`Total ${fyLabel(fy)}`,colSpan:4,styles:{halign:'left'}},inr.format(Y.wages),...ACC.flatMap(a=>[P2(Y.tot[a].c),P(Y.tot[a].q),P(Y.tot[a].b)]),P2(Y.A),P(Y.B),'',P(Y.C)]];
+ const redCols=new Set();ACC.forEach((a,i)=>{redCols.add(6+i*3);redCols.add(7+i*3);});redCols.add(21);redCols.add(23);
+ L.at(doc,{startY:y,head,body,foot,theme:'grid',margin:{left:30,right:30},
+  styles:{font:'helvetica',fontSize:6.6,cellPadding:2.2,halign:'right',lineColor:[214,221,231],lineWidth:0.4,textColor:[23,35,59],overflow:'linebreak'},
+  headStyles:TH,footStyles:{...FOOT,halign:'right',fontSize:6.6},
+  columnStyles:{0:{halign:'left',cellWidth:40},1:{halign:'left',cellWidth:40},2:{halign:'left',cellWidth:40},3:{cellWidth:30}},
+  didParseCell:d=>{if(d.section==='body'&&redCols.has(d.column.index))d.cell.styles.textColor=RED;}});
+ y=doc.lastAutoTable.finalY+12;const w=doc.internal.pageSize.getWidth(),Lb=fyLabel(fy);
+ L.at(doc,{startY:y,theme:'grid',margin:{left:w-30-330,right:30},tableWidth:330,
+  styles:{fontSize:8,cellPadding:3,lineColor:[23,35,59],lineWidth:0.5,textColor:[23,35,59]},
+  columnStyles:{0:{cellWidth:240},1:{halign:'right',fontStyle:'bold'}},
+  body:[[`Contribution deposited for the year (${Lb}) (A)`,'Rs. '+P(Y.A)],['7Q interest levied (B)','Rs. '+P(Y.B)],['14B damages calculated (C)','Rs. '+P(Y.C)],
+   ['14B levied at maximum 100% of contribution (D)','Rs. '+P(Y.D)],[`Amount to be deposited for the year (${Lb}) (B + D)`,'Rs. '+P(Y.total)]],
+  didParseCell:d=>{if(d.row.index===4){d.cell.styles.fillColor=[232,237,249];d.cell.styles.fontStyle='bold';}}});
+}
+function buildMonthlyPdf(all){const L=pdfLib();const doc=new L.J({orientation:'landscape',unit:'pt',format:'a4'});
+ (all?years():[curFY]).forEach((fy,i)=>{if(i)doc.addPage();monthPage(doc,L,fy);});pdfFooter(doc);return doc;}
+function buildYearlyPdf(){const L=pdfLib(),Y=allYears();const doc=new L.J({orientation:'portrait',unit:'pt',format:'a4'});
+ const y=pdfHeader(doc,'Year-wise summary of 7Q interest and 14B damages',`Period ${fyLabel(S.fromFY)} to ${fyLabel(S.toFY)}`);
+ const t={w:0,A:0,B:0,C:0,D:0,T:0};
+ const body=Y.map((v,i)=>{t.w+=v.wages;t.A+=v.A;t.B+=v.B;t.C+=v.C;t.D+=v.D;t.T+=v.total;return [i+1,fyLabel(v.fy),P(v.wages),P(v.A),P(v.B),P(v.C),P(v.D),P(v.total)];});
+ L.at(doc,{startY:y,theme:'grid',margin:{left:30,right:30},
+  head:[['Sl.','Financial year','Wages (Rs.)','Contribution (A)','7Q levied (B)','14B calculated (C)','14B levied, max 100% (D)','Amount to be deposited (B + D)']],
+  body,foot:[['','Grand total',P(t.w),P(t.A),P(t.B),P(t.C),P(t.D),P(t.T)]],
+  styles:{fontSize:8,cellPadding:3,halign:'right',lineColor:[214,221,231],lineWidth:0.4,textColor:[23,35,59]},headStyles:{...TH,fontSize:7.5},footStyles:{...FOOT,halign:'right'},
+  columnStyles:{0:{halign:'center',cellWidth:24},1:{halign:'left'},7:{fontStyle:'bold'}},
+  didParseCell:d=>{if(d.section==='body'&&d.column.index>=4&&d.column.index<=6)d.cell.styles.textColor=RED;}});
+ pdfFooter(doc);return doc;}
+function buildAcctPdf(){const L=pdfLib(),Y=allYears();const doc=new L.J({orientation:'landscape',unit:'pt',format:'a4'});
+ const y=pdfHeader(doc,'Account-wise summary of contribution, 7Q interest and 14B damages',`Period ${fyLabel(S.fromFY)} to ${fyLabel(S.toFY)}`);
+ const head=[[{content:'Sl.',rowSpan:2},{content:'Financial year',rowSpan:2},...ACC.map(a=>({content:ACN[a],colSpan:4})),{content:'All accounts',colSpan:4}],
+  [...ACC.flatMap(()=>['Contri.','7Q','14B calc.','14B levied']),'Contri. (A)','7Q (B)','14B levied (D)','B + D']];
+ const G=Array(24).fill(0);
+ const body=Y.map((v,i)=>{let d=0;const row=ACC.flatMap(a=>{const t=v.tot[a];d+=t.d;return [t.c,t.q,t.b,t.d];});row.push(v.A,v.B,d,v.B+d);row.forEach((x,j)=>G[j]+=x);return [i+1,fyLabel(v.fy),...row.map(P)];});
+ const red=new Set();for(let i=0;i<5;i++){red.add(3+i*4);red.add(4+i*4);red.add(5+i*4);}red.add(23);red.add(24);
+ L.at(doc,{startY:y,theme:'grid',margin:{left:30,right:30},head,body,foot:[[{content:'Grand total',colSpan:2,styles:{halign:'left'}},...G.map(P)]],
+  styles:{fontSize:6.6,cellPadding:2.2,halign:'right',lineColor:[214,221,231],lineWidth:0.4,textColor:[23,35,59]},headStyles:TH,footStyles:{...FOOT,halign:'right',fontSize:6.6},
+  columnStyles:{0:{halign:'center',cellWidth:18},1:{halign:'left',cellWidth:38},25:{fontStyle:'bold'}},
+  didParseCell:d=>{if(d.section==='body'&&red.has(d.column.index))d.cell.styles.textColor=RED;}});
+ pdfFooter(doc);return doc;}
+document.querySelectorAll('[data-pdf]').forEach(b=>b.addEventListener('click',async()=>{
+ if(!pdfLib()){toast('PDF library did not load. Check your connection and reload.');return;}
+ b.disabled=true;
+ try{const k=b.dataset.pdf;let doc,name;
+  if(k==='month-year'){doc=buildMonthlyPdf(false);name=`${fileBase()}_monthly_${fyLabel(curFY)}.pdf`;}
+  else if(k==='month-all'){doc=buildMonthlyPdf(true);name=`${fileBase()}_monthly_${fyLabel(S.fromFY)}_to_${fyLabel(S.toFY)}.pdf`;}
+  else if(k==='yearly'){doc=buildYearlyPdf();name=`${fileBase()}_year-wise_summary_${fyLabel(S.fromFY)}_to_${fyLabel(S.toFY)}.pdf`;}
+  else{doc=buildAcctPdf();name=`${fileBase()}_account-wise_summary_${fyLabel(S.fromFY)}_to_${fyLabel(S.toFY)}.pdf`;}
+  await saveFile(name,new Uint8Array(doc.output('arraybuffer')),'application/pdf','PDF');
+ }catch(e){console.error(e);toast('Could not create the PDF: '+(e.message||e));}
+ finally{b.disabled=false;}
+}));
+
+/* Saved cases (private to each signed-in user) */
+let db=null,uid=null;
+function caseCol(){return db.collection('data/users/'+uid);}
+const caseId=()=>(S.estCode||'untitled').trim().replace(/[^A-Za-z0-9_\-.~:@+]+/g,'_').replace(/^\.+$/,'_').slice(0,120)||'untitled';
+$('btnSave').addEventListener('click',async()=>{
+ if(!S.estCode.trim()){toast('Enter the establishment code to save the case');$('estCode').focus();return;}
+ try{await caseCol().doc(caseId()).set({...S,savedAt:new Date().toISOString()});toast(`Saved ${S.estCode}`);}catch(e){toast('Could not save: '+(e.message||e.code));}
+});
+$('btnOpen').addEventListener('click',async()=>{
+ const p=$('casesPanel');if(!p.hidden){p.hidden=true;return;}
+ try{const snap=await caseCol().get();const docs=snap.docs||[];
+  $('caseList').innerHTML=docs.length?docs.map(d=>{const x=d.data()||{};return `<li><span><strong>${esc(x.estCode||d.id)}</strong> ${esc(x.estName||'')} <span style="color:var(--muted);font-size:13px">${x.savedAt?new Date(x.savedAt).toLocaleString('en-IN'):''}</span></span><span><button data-open="${esc(d.id)}">Open</button> <button data-del="${esc(d.id)}">Delete</button></span></li>`;}).join(''):'<li>No saved cases yet. Fill in a case and select Save case.</li>';
+  p.hidden=false;}catch(e){toast('Could not load saved cases: '+(e.message||e.code));}
+});
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+$('caseList').addEventListener('click',async e=>{
+ const o=e.target.closest('[data-open]'),d=e.target.closest('[data-del]');
+ try{
+ if(o){const s=await caseCol().doc(o.dataset.open).get();if(s.exists){const x={...s.data()};delete x.savedAt;S=migrate(Object.assign(blank(),JSON.parse(JSON.stringify(x))));curFY=S.fromFY;persist();initForm();renderAll();$('casesPanel').hidden=true;toast(`Opened ${S.estCode}`);}}
+ if(d&&confirm('Delete this saved case?')){await caseCol().doc(d.dataset.del).delete();d.closest('li').remove();toast('Case deleted');}
+ }catch(err){toast('Something went wrong: '+(err.message||err.code));}
+});
+
+initForm();renderAll();
+(async()=>{if(!window.claude||!window.claude.use)return;
+ try{downloads=await window.claude.use('downloads');}catch(e){}
+ try{const [d,u]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+  if(d&&u){const id=await u.id();if(id){db=d;uid=id;$('btnSave').hidden=false;$('btnOpen').hidden=false;}}}catch(e){}
+})();
+</script>
+</body>
+</html>
